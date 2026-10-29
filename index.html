@@ -7,15 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<noscript><meta http-equiv="refresh" content="0; url=https://b3ba266df998a0.lhr.life/home"></noscript>
+<noscript><meta http-equiv="refresh" content="0; url=https://9f7d3c8169b714.lhr.life/home"></noscript>
 <style>
-/* Night Desk theme tokens (static/night-desk.css :root, 2026-09-25):
-   --ink #020617, --text #f8fafc, --text-2 #b9c3da, --signal #f5a524, --line #334155.
-   Contrast on --ink: text 19.3:1, text-2 11.4:1, signal 9.9:1 (WCAG AAA). */
-body{font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#020617;color:#f8fafc;margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#020617;color:#f8fafc;margin:0}
 main{text-align:center;padding:2rem;max-width:30rem}
 .spinner{width:2.6rem;height:2.6rem;border:3px solid #334155;border-top-color:#f5a524;border-radius:50%;margin:0 auto 1.2rem;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -33,61 +27,40 @@ button:active{transform:scale(.97)}
 <h1 id="headline">Connecting to your cockpit…</h1>
 <p id="detail" class="small">Finding the fastest route — this usually takes a few seconds.</p>
 <p><button id="retry" type="button">Try again now</button></p>
-<p class="small">If this keeps spinning, you can <a id="direct" href="https://b3ba266df998a0.lhr.life/home">open the cockpit directly</a>.</p>
-<p class="small" id="gap-note">Seeing the tunnel provider's "no tunnel here" page instead? The tunnel is rotating — come back here and tap "Try again now".</p>
+<p class="small">If this keeps spinning, you can <a id="direct" href="https://9f7d3c8169b714.lhr.life/home">open the cockpit directly</a>.</p>
+<p class="small" id="gap-note">Seeing the tunnel provider's "no tunnel here" page instead? Come back here and tap "Try again now" — it tries the next live link.</p>
 </main>
 <script>
 (function(){
-var LANDING="https://b3ba266df998a0.lhr.life/home";
+var FALLBACK="https://9f7d3c8169b714.lhr.life/home";
 var headline=document.getElementById('headline');
 var detail=document.getElementById('detail');
 var direct=document.getElementById('direct');
 var retry=document.getElementById('retry');
-// Retry cadence: quick first attempts, then a calm 30s rhythm. A tunnel
-// rotation takes ~1 min for the Pages rebuild, so the fresh link lands
-// within a couple of tries without hammering the server.
-var DELAYS=[3000,8000,20000];
-var STEADY=30000;
-var attempt=0;
-var timer=null;
+// Pool-aware loader (2026-10-29): status.json carries every live tunnel.
+// Each visit (or retry tap) tries the NEXT member, so a dead member costs
+// one tap, never a wait for a rebuild — the next member was already live.
+var idx=0;
+try{idx=parseInt(sessionStorage.getItem('saadai_pool_idx')||'0',10)||0;}catch(e){idx=0;}
 function say(h,d){headline.textContent=h;detail.textContent=d;}
-function schedule(){
-  if(timer){clearTimeout(timer);}  // harden: never stack timers
-  var wait=attempt<DELAYS.length?DELAYS[attempt]:STEADY;
-  attempt++;
-  timer=setTimeout(load,wait);
-}
 function load(){
-  // First attempt shows "Connecting…"; once a retry is in flight the
-  // calmer "Reconnecting…" stays put instead of flickering back.
-  if(attempt===0){say('Connecting to your cockpit…','Finding the fastest route — this usually takes a few seconds.');}
   fetch('status.json?t='+Date.now(),{cache:'no-store'})
     .then(function(r){if(!r.ok){throw 0;}return r.json();})
     .then(function(s){
-      var target=(s&&s.url)?s.url:LANDING;
+      var pool=(s&&s.pool&&s.pool.length)?s.pool:[(s&&s.url)?s.url:FALLBACK];
+      var target=pool[idx%pool.length];
       direct.href=target;
-      // Redirect straight to the published link. keepalive.sh already
-      // content-verifies the tunnel (SaadAi / bottomnav markers) before it
-      // ever publishes a URL here; an in-page CORS probe can never pass
-      // because the tunnel sends no Access-Control-Allow-Origin header,
-      // which trapped the page on the spinner forever (Saad, 2026-09-25).
+      try{sessionStorage.setItem('saadai_pool_idx',String((idx+1)%pool.length));}catch(e){}
       say('Connected.','Opening your cockpit now.');
       window.location.replace(target);
     })
     .catch(function(){
-      // ISS-393 (2026-09-29): name the rotation gap honestly. When the
-      // tunnel dies mid-rotation the bookmark can land on the provider's
-      // "no tunnel here" dead page with no guidance; this loader is the
-      // operator's way back — say what's happening and that retrying
-      // works. Calm, honest status — no error codes, no "connection
-      // lost" language. schedule() keeps retrying on its own; the button
-      // and the direct link below stay as manual fallbacks.
       say('The tunnel is rotating — retry in a moment.',
           'The cockpit link is refreshing. This page retries on its own — or tap "Try again now" below.');
-      schedule();
+      setTimeout(load,30000);
     });
 }
-retry.addEventListener('click',function(){attempt=0;if(timer){clearTimeout(timer);}load();});
+retry.addEventListener('click',function(){load();});
 load();
 })();
 </script>
